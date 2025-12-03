@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防詐騙雷達：高風險投資警示</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons (使用圖片替代或SVG) -->
+    <!-- 為了單一檔案穩定性，我們將直接在 React 組件中使用 SVG 代碼，不依賴外部 Icon 庫 -->
+
+    <style>
+        /* 翻轉卡片所需的 3D CSS */
+        .perspective-1000 {
+            perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        
+        /* 動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- 內嵌 SVG 圖示組件 ---
+        const Icons = {
+            ShieldAlert: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+            Coins: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7 .71-2.82 8.49"/></svg>,
+            Landmark: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>,
+            Globe: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+            AlertTriangle: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+            ChevronRight: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+            Lock: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+            RefreshCw: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>,
+            Info: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>,
+            TrendingUp: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+            Megaphone: (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>
+        };
+
+        // --- 組件：全域警示 Banner ---
+        const WarningBanner = () => (
+            <div className="bg-red-600 text-white p-3 shadow-md animate-fadeIn">
+                <div className="max-w-6xl mx-auto flex items-start md:items-center gap-3 px-4">
+                    <Icons.Megaphone className="w-6 h-6 flex-shrink-0 animate-bounce" />
+                    <div className="text-sm md:text-base font-bold">
+                        防詐關鍵提醒：投資絕對不要私下交付現金！請務必尋找「金管會核准」之國內合法券商或金融機構辦理。
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- 組件：首頁 ---
+        const Home = ({ onChangeTab }) => (
+            <div className="space-y-6 animate-fadeIn">
+                <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-8 rounded-2xl border border-slate-700 shadow-xl text-white">
+                    <h1 className="text-3xl font-bold mb-4 flex items-center gap-3">
+                        <Icons.ShieldAlert className="w-10 h-10 text-red-500" />
+                        防詐騙雷達：高風險投資警示
+                    </h1>
+                    <p className="text-slate-300 text-lg mb-6">
+                        詐騙手法層出不窮，任何標榜「高獲利、保證獲利」且要求「面交現金」或「匯款至個人帳戶」的行為，極高機率為詐騙。
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button onClick={() => onChangeTab('gold')} className="bg-yellow-600/20 hover:bg-yellow-600/30 border border-yellow-600/50 p-4 rounded-xl text-left transition-all group">
+                            <div className="flex items-center justify-between mb-2">
+                                <Icons.Coins className="w-8 h-8 text-yellow-500" />
+                                <Icons.ChevronRight className="w-5 h-5 text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <h3 className="font-bold text-yellow-100 text-xl">黃金紙合約</h3>
+                            <p className="text-sm text-yellow-200/70 mt-1">假託管真吸金，龐氏騙局變形。</p>
+                        </button>
+
+                        <button onClick={() => onChangeTab('unregulated')} className="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-600/50 p-4 rounded-xl text-left transition-all group">
+                            <div className="flex items-center justify-between mb-2">
+                                <Icons.Landmark className="w-8 h-8 text-blue-400" />
+                                <Icons.ChevronRight className="w-5 h-5 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <h3 className="font-bold text-blue-100 text-xl">非列管金融商品</h3>
+                            <p className="text-sm text-blue-200/70 mt-1">不受金管會監管的高風險黑洞。</p>
+                        </button>
+
+                        <button onClick={() => onChangeTab('forex')} className="bg-green-600/20 hover:bg-green-600/30 border border-green-600/50 p-4 rounded-xl text-left transition-all group">
+                            <div className="flex items-center justify-between mb-2">
+                                <Icons.Globe className="w-8 h-8 text-green-400" />
+                                <Icons.ChevronRight className="w-5 h-5 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <h3 className="font-bold text-green-100 text-xl">境外外匯投資</h3>
+                            <p className="text-sm text-green-200/70 mt-1">假平台、殺豬盤，入金即肉包子打狗。</p>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-lg shadow-sm">
+                    <div className="flex items-start gap-4">
+                        <Icons.Info className="w-8 h-8 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="font-bold text-red-800 text-lg mb-2">核心觀念：金管會管不到怎麼辦？</h4>
+                            <p className="text-red-700 mb-3 leading-relaxed">
+                                所謂「非金管會核准」意味著當發生糾紛或平台倒閉時，政府無法透過金融消費者保護法協助您求償。
+                                <br/>
+                                詐騙集團常話術誘導：「我們是外商，為了避稅所以不走台灣金管會」、「給現金比較快」。
+                                <br/>
+                                <strong>請記住：任何正規金融機構，絕不會派人向您收取現金！</strong>
+                            </p>
+                            <div className="bg-white/50 p-3 rounded border border-red-200 text-red-800 text-sm font-bold">
+                                遇到可疑狀況，請直接撥打 165 反詐騙專線查證。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- 組件：黃金紙合約 ---
+        const GoldScam = () => {
+            const [investment, setInvestment] = useState(100000);
+            const [months, setMonths] = useState(0);
+            const [status, setStatus] = useState('active'); 
+
+            const monthlyRate = 0.08; 
+            const totalProfit = Math.floor(investment * monthlyRate * months);
+
+            const handleSimulate = () => {
+                if (months < 6) {
+                    setMonths(prev => prev + 1);
+                } else {
+                    setStatus('scam_revealed');
+                }
+            };
+
+            const reset = () => {
+                setMonths(0);
+                setStatus('active');
+            };
+
+            return (
+                <div className="space-y-6 animate-fadeIn">
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2 mb-4">
+                            <Icons.Coins className="text-yellow-500" /> 黃金紙合約模擬器
+                        </h2>
+                        <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6 text-sm text-yellow-800">
+                             <strong>詐騙手法：</strong> 詐騙集團成立空殼公司，聲稱幫你買黃金並託管在金庫。
+                             <br/>
+                             他們會說：「拿現金來買比較便宜」、「不用保管費」，但實際上他們根本沒買黃金，是用後金補前金的龐氏騙局。
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">投入本金 (TWD)</label>
+                                    <input 
+                                        type="range" min="10000" max="1000000" step="10000" 
+                                        value={investment}
+                                        onChange={(e) => setInvestment(parseInt(e.target.value))}
+                                        disabled={months > 0}
+                                        className="w-full h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-yellow-600"
+                                    />
+                                    <div className="text-right font-mono font-bold text-xl text-slate-800 mt-2">
+                                        ${investment.toLocaleString()}
+                                    </div>
+                                </div>
+
+                                {status === 'active' ? (
+                                    <button onClick={handleSimulate} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                                        <Icons.RefreshCw className="w-5 h-5" />
+                                        {months === 0 ? "簽署合約並交付現金 (模擬)" : "經過一個月 (領取配息)"}
+                                    </button>
+                                ) : (
+                                    <button onClick={reset} className="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                                        <Icons.RefreshCw className="w-5 h-5" /> 重新模擬
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white min-h-[250px]">
+                                {status === 'scam_revealed' && (
+                                    <div className="absolute inset-0 bg-red-900/95 z-10 flex flex-col items-center justify-center text-white p-6 text-center animate-fadeIn">
+                                        <Icons.AlertTriangle className="w-16 h-16 text-red-400 mb-4" />
+                                        <h3 className="text-2xl font-bold mb-2">公司惡意倒閉！</h3>
+                                        <p className="mb-4">負責人捲款潛逃，辦公室人去樓空。你手上的紙本合約變成廢紙。</p>
+                                        <div className="bg-red-800/50 p-4 rounded-lg w-full">
+                                            <div className="flex justify-between font-bold text-xl">
+                                                <span>總損失：</span>
+                                                <span>-${(investment - totalProfit).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="p-6 h-full flex flex-col justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-slate-700 mb-4">帳戶概況</h3>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-500">經過時間</span>
+                                                <span className="font-mono text-xl">{months} 個月</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-500">累積配息 (假象)</span>
+                                                <span className="font-mono text-xl text-green-600">+${totalProfit.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-500">本金狀態</span>
+                                                <span className="font-mono text-xl text-slate-800">託管中 (無法提領)</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 組件：翻轉卡片 ---
+        // 修正了 CSS 類別以確保翻轉效果運作
+        const FlipCard = ({ item }) => {
+            const [isFlipped, setIsFlipped] = useState(false);
+
+            return (
+                <div 
+                    className="h-72 cursor-pointer perspective-1000 group select-none"
+                    onClick={() => setIsFlipped(!isFlipped)}
+                >
+                    <div className={`relative w-full h-full transition-transform duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+                        {/* 正面 */}
+                        <div className="absolute inset-0 bg-white border-2 border-slate-100 rounded-xl p-6 shadow-sm flex flex-col items-center justify-center text-center backface-hidden hover:border-blue-300 transition-colors">
+                            <div className="mb-4 bg-slate-50 p-4 rounded-full">{item.icon}</div>
+                            <h3 className="font-bold text-lg text-slate-800 mb-2">{item.title}</h3>
+                            <p className="text-slate-500 text-sm mb-4">{item.desc}</p>
+                            <span className="mt-auto inline-block bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full animate-pulse">
+                                點擊翻面查看風險
+                            </span>
+                        </div>
+
+                        {/* 背面 */}
+                        <div className="absolute inset-0 bg-slate-800 rounded-xl p-6 text-white flex flex-col items-center justify-center text-center backface-hidden rotate-y-180 border-2 border-slate-700 shadow-xl">
+                            <Icons.AlertTriangle className="w-10 h-10 text-red-400 mb-3" />
+                            <h4 className="font-bold text-red-400 mb-3 text-lg">高風險警告</h4>
+                            <p className="text-sm leading-relaxed text-slate-200">{item.risk}</p>
+                            <div className="mt-4 pt-3 border-t border-slate-600 w-full text-xs text-slate-400">
+                                {item.note || "非金管會管轄範圍"}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 組件：非列管金融商品 ---
+        const UnregulatedProducts = () => {
+            const products = [
+                {
+                    title: "境外保單 (Offshore Insurance)",
+                    icon: <Icons.Lock className="w-8 h-8 text-purple-500" />,
+                    desc: "未經金管會核准的外國保險公司保單。",
+                    risk: "若保險公司倒閉或不理賠，台灣法律無法保護，需自行跨國打官司。且無「保險安定基金」保障，保費可能血本無歸。",
+                    note: "正確做法：找國內合法壽險公司"
+                },
+                {
+                    title: "虛擬資產交易平台 (部分)",
+                    icon: <Icons.Coins className="w-8 h-8 text-orange-500" />,
+                    desc: "未完成金管會洗錢防制法令遵循聲明的交易所。",
+                    risk: "平台可能隨時遭駭客攻擊、負責人挪用資產或突然倒閉（Rug Pull）。不受存款保險保障。",
+                    note: "正確做法：查詢金管會已合規名單"
+                },
+                {
+                    title: "P2P 借貸平台 (Peer-to-Peer)",
+                    icon: <Icons.RefreshCw className="w-8 h-8 text-blue-500" />,
+                    desc: "個人對個人的網路借貸媒合平台。",
+                    risk: "台灣目前僅有指導原則，無專法監管。常見風險：假債權（根本沒人借錢，錢被平台拿走）、借款人違約率高、平台捲款。",
+                    note: "正確做法：透過銀行進行借貸"
+                },
+                {
+                    title: "二元期權 (Binary Options)",
+                    icon: <Icons.TrendingUp className="w-8 h-8 text-red-500" />,
+                    desc: "押注資產在極短時間內漲跌的交易。",
+                    risk: "這不是投資，是賭博。多數平台後台可操控數據，讓你先贏後輸，或者贏了也無法提領（無法出金）。",
+                    note: "正確做法：國內期貨商開戶"
+                },
+                {
+                    title: "未上市股票 (直銷兜售)",
+                    icon: <Icons.Landmark className="w-8 h-8 text-green-600" />,
+                    desc: "透過電話推銷所謂「即將上市」的股票。",
+                    risk: "資訊極度不透明，可能永遠不會上市。推銷員常要求「面交現金」換取股票憑證，最後股票淪為廢紙。",
+                    note: "正確做法：透過合法券商買賣上市櫃股票"
+                }
+            ];
+
+            return (
+                <div className="space-y-6 animate-fadeIn">
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                        <h2 className="text-2xl font-bold text-slate-800 mb-2 flex items-center gap-2">
+                            <Icons.AlertTriangle className="text-blue-600" /> 非金管會列管/高風險商品圖鑑
+                        </h2>
+                        
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded text-sm text-red-800">
+                            <strong>重要警示：</strong> 這些商品因為 <strong>不受台灣金管會直接監管</strong>，風險極高。
+                            <br/>
+                            一旦遇到詐騙或倒閉，求償極度困難。請點擊下方卡片翻面，查看詳細風險內容。
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {products.map((item, index) => (
+                                <FlipCard key={index} item={item} />
+                            ))}
+                        </div>
+                        
+                        <div className="mt-8 p-5 bg-slate-100 rounded-lg text-slate-700">
+                            <h4 className="font-bold mb-3 text-lg flex items-center gap-2">
+                                <Icons.CheckCircle className="w-5 h-5 text-green-600" /> 
+                                如何保護自己？正確做法如下
+                            </h4>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li><strong>拒絕現金交易：</strong> 合法投資一律透過銀行帳戶匯款至公司專戶，絕不會要求面交現金或匯款給個人。</li>
+                                <li><strong>查詢合法業者：</strong> 
+                                    <ul className="list-circle pl-5 mt-1 text-sm text-slate-600">
+                                        <li>證券期貨：查詢金管會證期局「核准之證券期貨業者」。</li>
+                                        <li>保險商品：查詢保險局「核准之保險商品」。</li>
+                                    </ul>
+                                </li>
+                                <li><strong>撥打 165：</strong> 只要有人宣稱「保證獲利」、「特殊管道」，先掛電話撥打 165。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        // --- 組件：CheckCircle Icon (補漏) ---
+        Icons.CheckCircle = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
+
+
+        // --- 組件：境外外匯聊天室 (增強真實版) ---
+        const ForexScam = () => {
+            const [messages, setMessages] = useState([
+                { id: 1, sender: 'scammer', text: '大家好，我是陳老師。今晚非農數據公佈，我們AI系統預測黃金會大漲，勝率99%！' },
+                { id: 2, sender: 'bot', text: '林大哥：跟著老師做就對了，上個月我獲利已經超過本金了。' },
+                { id: 3, sender: 'system', text: '「王大明」加入群組' },
+                { id: 4, sender: 'bot', text: 'Amy助理：歡迎新朋友！目前開放最後 5 個「VIP帶單名額」，要搶要快！' },
+            ]);
+            // step 狀態說明: 
+            // 0: 初始, 0.5: 質疑中(尚未踢出), 1: 準備入金, 2: 已入金獲利, 3: 被踢出, 4: 詐騙揭穿(無法出金)
+            const [step, setStep] = useState(0); 
+            const scrollRef = useRef(null);
+
+            useEffect(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, [messages]);
+
+            const addMessage = (sender, text) => {
+                setMessages(prev => [...prev, { id: Date.now(), sender, text }]);
+            };
+
+            const handleChoice = (choice) => {
+                if (choice === 'invest') {
+                    addMessage('user', '聽起來不錯，我想了解怎麼操作？');
+                    setTimeout(() => {
+                        addMessage('scammer', '私訊助理 @Amy 開戶。目前有「新戶儲值優惠」，入金 10 萬送 1 萬！');
+                        setTimeout(() => {
+                            addMessage('bot', '李大姐：還好我有跟上這波，昨天剛把退休金轉進來，今天就漲了！');
+                             setStep(1); // Ready to deposit
+                        }, 1000);
+                    }, 1000);
+                } else if (choice === 'question_1') {
+                    addMessage('user', '請問這有金管會監管嗎？為什麼要匯款到個人帳戶？');
+                    setTimeout(() => {
+                        addMessage('scammer', '我們是受美國 NFA 監管的(假牌照)。匯個人戶是為了幫大家「節稅」，走正規管道會被扣 20% 稅金，老師是為了大家好！');
+                        setTimeout(() => {
+                             addMessage('bot', '陳大哥：樓上的，老師帶我們賺這麼多，你還懷疑？不懂就不要佔名額！');
+                             setStep(0.5); // 進入質疑階段，尚未踢出
+                        }, 1500);
+                    }, 1000);
+                } else if (choice === 'question_2_aggressive') {
+                     addMessage('user', '可是我查了 NFA 官網查不到你們，而且正規券商絕對不會用個人戶收款，這很像洗錢。');
+                     setTimeout(() => {
+                         addMessage('scammer', '你要是不信就退群，不要擋人財路！我們這裡只收有執行力的人。');
+                         setTimeout(() => {
+                             addMessage('system', '您已被管理員移除群組');
+                             setStep(3); // Kicked out
+                         }, 1500);
+                     }, 1000);
+                } else if (choice === 'question_2_accept') {
+                    addMessage('user', '好吧...既然大家都賺錢，那我也試試看好了。');
+                    setTimeout(() => {
+                        addMessage('scammer', '想通就好，現在行情正好，趕快私訊助理入金。');
+                        setStep(1); // 轉為受騙模式
+                    }, 1000);
+                } else if (choice === 'deposit') {
+                    addMessage('user', '好的，我匯款了30萬過去。');
+                    setTimeout(() => {
+                        addMessage('scammer', '收到了，帳面已經獲利 50%，恭喜！');
+                        setTimeout(() => {
+                            addMessage('bot', '王大哥：太神啦！我也要加碼 50 萬！');
+                            setStep(2);
+                        }, 1000);
+                    }, 1000);
+                } else if (choice === 'withdraw') {
+                    addMessage('user', '我想先出金本金看看。');
+                    setTimeout(() => {
+                        addMessage('scammer', '現在系統維護中，而且你需要先繳納 20% 的保證金才能出金。');
+                        setTimeout(() => {
+                            setStep(4); 
+                        }, 1500);
+                    }, 1000);
+                }
+            };
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn h-[600px]">
+                    <div className="lg:col-span-2 bg-slate-100 rounded-2xl border border-slate-300 flex flex-col overflow-hidden shadow-inner">
+                        <div className="bg-slate-800 p-4 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold">陳</div>
+                                <div>
+                                    <div className="font-bold">華爾街煉金術-陳老師 (358人)</div>
+                                    <div className="text-xs text-slate-300">境外外匯/黃金/原油</div>
+                                </div>
+                            </div>
+                            <Icons.Info className="w-5 h-5 text-slate-400" />
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
+                            {messages.map((msg) => (
+                                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : msg.sender === 'system' ? 'justify-center' : 'justify-start'}`}>
+                                    {msg.sender === 'system' ? (
+                                        <span className="text-xs text-slate-400 bg-slate-200 px-2 py-1 rounded-full">{msg.text}</span>
+                                    ) : (
+                                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                                            msg.sender === 'user' ? 'bg-blue-500 text-white rounded-tr-none' : 
+                                            msg.sender === 'scammer' ? 'bg-white border border-slate-200 text-slate-800 rounded-tl-none shadow-sm' :
+                                            'bg-green-100 text-slate-800 border border-green-200'
+                                        }`}>
+                                            {msg.sender === 'scammer' && <div className="text-xs text-red-500 font-bold mb-1">陳老師</div>}
+                                            {msg.sender === 'bot' && <div className="text-xs text-slate-500 mb-1 font-bold">群組成員</div>}
+                                            {msg.text}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {step === 0.5 && (
+                                <div className="bg-orange-100 border border-orange-400 text-orange-800 px-4 py-2 rounded text-xs animate-pulse">
+                                    <strong>警覺點：</strong> 詐騙集團會利用「暗樁」製造同儕壓力，並用「節稅」等藉口合理化非法行為。
+                                </div>
+                            )}
+                            {step === 4 && (
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative animate-pulse" role="alert">
+                                    <strong className="font-bold">這就是詐騙！</strong>
+                                    <span className="block sm:inline">典型的「殺豬盤」。當你投入資金（不管是現金或匯款），想拿回來時就會遇到各種阻礙。</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-white border-t border-slate-200">
+                            {step === 0 && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleChoice('invest')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-bold">聽起來很賺，想了解</button>
+                                    <button onClick={() => handleChoice('question_1')} className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 px-4 rounded-lg text-sm font-bold">質疑為何匯個人戶</button>
+                                </div>
+                            )}
+                            {step === 0.5 && (
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleChoice('question_2_accept')} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-bold">好吧，看大家都在賺...</button>
+                                    <button onClick={() => handleChoice('question_2_aggressive')} className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-2 px-4 rounded-lg text-sm font-bold">不對，這一定是詐騙！(繼續質疑)</button>
+                                </div>
+                            )}
+                            {step === 1 && <button onClick={() => handleChoice('deposit')} className="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-bold">嘗試匯款/面交 (模擬)</button>}
+                            {step === 2 && <button onClick={() => handleChoice('withdraw')} className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-bold">申請出金</button>}
+                            {(step === 3 || step === 4) && <button onClick={() => window.location.reload()} className="w-full bg-slate-800 text-white py-2 px-4 rounded-lg text-sm font-bold">重新開始</button>}
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow border border-slate-200 flex flex-col gap-4">
+                        <h3 className="font-bold text-lg flex items-center gap-2"><Icons.Globe className="text-green-600" /> 境外外匯詐騙特徵</h3>
+                        <div className="space-y-4 text-sm text-slate-600">
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                                <h4 className="font-bold text-slate-800 mb-1">1. 群組暗樁 (樁腳)</h4>
+                                <p>群組裡 90% 的人可能都是詐騙集團的分身。當你質疑時，他們會圍攻你，讓你懷疑自己。</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                                <h4 className="font-bold text-slate-800 mb-1">2. 匯款給個人/面交現金</h4>
+                                <p className="text-red-600 font-bold">這絕對是詐騙！合法券商一定有公司的專用交割帳戶，不會為了「節稅」走個人戶。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 主程式 ---
+        const AntiFraudApp = () => {
+            const [activeTab, setActiveTab] = useState('home');
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+                    <WarningBanner />
+                    
+                    <nav className="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+                        <div className="max-w-6xl mx-auto px-4">
+                            <div className="flex items-center justify-between h-16">
+                                <div className="flex items-center gap-2 font-bold text-xl cursor-pointer" onClick={() => setActiveTab('home')}>
+                                    <Icons.ShieldAlert className="text-red-500 w-6 h-6" />
+                                    <span>防詐騙雷達</span>
+                                </div>
+                                <div className="flex gap-1 md:gap-4 overflow-x-auto">
+                                    <NavButton active={activeTab === 'home'} onClick={() => setActiveTab('home')} label="首頁" />
+                                    <NavButton active={activeTab === 'gold'} onClick={() => setActiveTab('gold')} label="黃金詐騙" />
+                                    <NavButton active={activeTab === 'unregulated'} onClick={() => setActiveTab('unregulated')} label="非列管商品" />
+                                    <NavButton active={activeTab === 'forex'} onClick={() => setActiveTab('forex')} label="境外外匯" />
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <main className="max-w-6xl mx-auto px-4 py-8 pb-24 flex-grow w-full">
+                        {activeTab === 'home' && <Home onChangeTab={setActiveTab} />}
+                        {activeTab === 'gold' && <GoldScam />}
+                        {activeTab === 'unregulated' && <UnregulatedProducts />}
+                        {activeTab === 'forex' && <ForexScam />}
+                    </main>
+
+                    <footer className="bg-slate-800 text-slate-300 py-6 border-t border-slate-700">
+                        <div className="max-w-6xl mx-auto px-4 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <div className="font-bold text-red-400 text-lg mb-1">反詐騙諮詢專線：165</div>
+                                <div className="text-sm">24小時服務，有疑慮請立即撥打。</div>
+                            </div>
+                            <div className="text-sm text-slate-400 text-center md:text-right">
+                                <p>投資前請詳閱金管會核准名單</p>
+                                <p>切勿聽信來源不明的投資群組或理財專家</p>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const NavButton = ({ active, onClick, label }) => (
+            <button 
+                onClick={onClick}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                    active ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+            >
+                {label}
+            </button>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AntiFraudApp />);
+    </script>
+</body>
+</html>
